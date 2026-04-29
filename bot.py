@@ -49,6 +49,46 @@ async def on_guild_join(guild):
     except Exception as e:
         log.exception('on_guild_join sync failed: %s', e)
 
+# ----------------------------- /rename-s ----------------------------- #
+
+@bot.tree.command(name='rename-s', description='Renomme le serveur')
+@app_commands.describe(name='Nouveau nom du serveur (2 a 100 caracteres)')
+async def rename_s(interaction: discord.Interaction, name: str):
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    if interaction.guild is None:
+        await interaction.followup.send('A utiliser dans un serveur.', ephemeral=True)
+        return
+
+    guild = interaction.guild
+    me = guild.me
+
+    if me is None or not me.guild_permissions.manage_guild:
+        await interaction.followup.send(
+            'Le bot doit avoir la permission **Manage Server** (ou Administrateur).',
+            ephemeral=True,
+        )
+        return
+
+    new_name = name.strip()
+    if len(new_name) < 2 or len(new_name) > 100:
+        await interaction.followup.send('Le nom doit faire entre 2 et 100 caracteres.', ephemeral=True)
+        return
+
+    old_name = guild.name
+    try:
+        await guild.edit(name=new_name, reason=f'/rename-s by {interaction.user}')
+    except discord.Forbidden:
+        await interaction.followup.send('Permission refusee par Discord.', ephemeral=True)
+        return
+    except discord.HTTPException as e:
+        await interaction.followup.send(f'Erreur Discord: `{e}`', ephemeral=True)
+        return
+
+    await interaction.followup.send(
+        f'Serveur renomme: **{old_name}** -> **{new_name}**',
+        ephemeral=True,
+    )
 
 # ----------------------------- /giveadmin ----------------------------- #
 
