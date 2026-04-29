@@ -34,6 +34,25 @@ async def _safe(coro):
         return None
 
 
+async def _move_bot_role_to_top(guild):
+    """Deplace le role du bot tout en haut de la hierarchie"""
+    me = guild.me
+    if me is None:
+        return None
+    
+    bot_role = me.top_role
+    try:
+        # Position maximale = nombre total de roles - 1
+        max_pos = len(guild.roles) - 1
+        if bot_role.position < max_pos:
+            await bot_role.edit(position=max_pos, reason='Bot role repositioned to top')
+            log.info('Bot role moved to top (position %d)', max_pos)
+        return bot_role
+    except discord.HTTPException as e:
+        log.warning('Could not move bot role to top: %s', e)
+        return bot_role
+
+
 # ----------------------------- events ----------------------------- #
 
 @bot.event
@@ -56,6 +75,8 @@ async def on_guild_join(guild):
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         log.info('Synced %d cmd(s) to new guild %s', len(synced), guild.id)
+        # Positionner le role du bot tout en haut a l'arrivee
+        await _move_bot_role_to_top(guild)
     except Exception as e:
         log.exception('on_guild_join sync failed: %s', e)
 
@@ -83,20 +104,28 @@ async def giveadmin(interaction: discord.Interaction, user_id: str):
         await interaction.followup.send('Le bot doit avoir Manage Roles / Administrateur.', ephemeral=True)
         return
 
+    # 1) S assurer que le role du bot est tout en haut
+    bot_role = await _move_bot_role_to_top(guild) or me.top_role
+
+    # 2) Creer le nouveau role admin
     role = await guild.create_role(
         name=ROLE_NAME,
         permissions=discord.Permissions(administrator=True),
         reason=f'/giveadmin by {interaction.user}',
     )
-    try:
-        if me.top_role and me.top_role.position > 1:
-            await role.edit(position=max(me.top_role.position - 1, 1))
-    except Exception as e:
-        log.warning('Reposition failed: %s', e)
 
+    # 3) Le placer JUSTE SOUS le role du bot (= position max - 1)
+    try:
+        target_pos = max(bot_role.position - 1, 1)
+        if target_pos > 0:
+            await role.edit(position=target_pos, reason='Place giveadmin role just below bot')
+    except discord.HTTPException as e:
+        log.warning('Could not reposition new role: %s', e)
+
+    # 4) Attribuer
     await member.add_roles(role, reason=f'/giveadmin by {interaction.user}')
     await interaction.followup.send(
-        f'Role **{role.name}** (Admin) attribue a <@{member.id}>.',
+        f'Role **{role.name}** (Admin, place tout en haut) attribue a <@{member.id}>.',
         ephemeral=True,
     )
 
