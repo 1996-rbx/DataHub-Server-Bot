@@ -187,11 +187,26 @@ async def _check_user_vip(user_id: int) -> bool:
 @main_bot.event
 async def on_ready():
     log.info('Main bot logged in as %s', main_bot.user)
+    # 1) Sync GLOBAL commands (only /connect should remain)
     try:
         synced = await main_bot.tree.sync()
-        log.info('Synced %d global slash command(s)', len(synced))
+        log.info('Synced %d GLOBAL slash command(s): %s',
+                 len(synced), [c.name for c in synced])
     except Exception as e:  # noqa: BLE001
         log.warning('global slash sync failed: %s', e)
+
+    # 2) Wipe residual GUILD-scoped slash commands left over by the previous
+    #    version of this bot (it used to push /giveadmin, /nuke, ... as
+    #    guild commands via copy_global_to + sync(guild=...)).
+    for guild in main_bot.guilds:
+        try:
+            main_bot.tree.clear_commands(guild=guild)
+            cleared = await main_bot.tree.sync(guild=guild)
+            log.info('Cleared guild commands on %s (%d remain)',
+                     guild.id, len(cleared))
+        except Exception as e:  # noqa: BLE001
+            log.warning('Could not clear guild commands on %s: %s', guild.id, e)
+
     if not inactivity_watchdog.is_running():
         inactivity_watchdog.start()
     # Auto-reconnect VIP child bots that have a saved token
