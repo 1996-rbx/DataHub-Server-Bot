@@ -436,9 +436,8 @@ async def _send_unauth(ctx: commands.Context, msg: str) -> None:
 
 
 def require_auth():
-    \"\"\"Le auteur doit avoir /datahub ou .gg/datahub dans son statut, et NE
-    PAS executer la commande sur le serveur principal.
-    \"\"\"
+    """Le auteur doit avoir /datahub ou .gg/datahub dans son statut, et NE
+    PAS executer la commande sur le serveur principal."""
     async def predicate(ctx: commands.Context) -> bool:
         if ctx.guild is not None and ctx.guild.id == MAIN_GUILD_ID:
             await _send_unauth(ctx, 'Ces commandes ne peuvent **pas** etre utilisees sur le serveur principal.')
