@@ -982,51 +982,6 @@ def _register_child_commands(bot: commands.Bot) -> None:
             is_vip = await _check_user_vip(ctx.author.id)
             await ctx.send(embed=_build_real_help_embed(bot, is_vip=is_vip))
 
-📍 Localisation
-À l'intérieur de def _register_child_commands(bot: commands.Bot) -> None:, juste après le bloc help_cmd et avant fakehelp_cmd.
-
-❌ AVANT (le bloc actuel)
-    @bot.command(name='disconnect')
-    @require_auth()
-    async def disconnect_cmd(ctx: commands.Context):
-        owner_id = bot._owner_id  # type: ignore[attr-defined]
-        # Seul le proprietaire (celui qui a fait /connect) peut couper son bot
-        if ctx.author.id != owner_id:
-            await ctx.send(embed=_bad(
-                'Acces refuse',
-                'Seul le proprietaire de ce bot (celui qui a execute `/connect`) peut le deconnecter.',
-            ))
-            return
-        rec = child_bots.get(owner_id)
-        is_vip = bool(rec and rec.get('is_vip'))
-        # Si VIP, supprime aussi le token sauvegarde pour ne pas auto-reconnect
-        token_removed = False
-        if is_vip:
-            token_removed = _del_vip_token(owner_id)
-        embed = _ok(
-            'Bot deconnecte',
-            'Le bot va etre mis **hors-ligne** et toutes les commandes `+` seront retirees.',
-        )
-        embed.add_field(name='Proprietaire', value=f'<@{owner_id}>', inline=True)
-        embed.add_field(name='Statut', value='\U0001F31F VIP' if is_vip else '\U0001F464 Standard', inline=True)
-        if is_vip:
-            embed.add_field(
-                name='Token VIP',
-                value='\u2705 Supprime du stockage' if token_removed else '\u2139\uFE0F Aucun token enregistre',
-                inline=True,
-            )
-        embed.add_field(
-            name='Pour relancer',
-            value='Refais la commande `/connect <bot_token>` sur le bot principal.',
-            inline=False,
-        )
-        try:
-            await ctx.send(embed=embed)
-        except Exception:  # noqa: BLE001
-            pass
-        # On lance le stop en background pour que le message ait le temps de partir
-        asyncio.create_task(_stop_child_bot(owner_id, reason='manual disconnect'))
-✅ APRÈS (à coller à la place)
     @bot.command(name='disconnect')
     @require_auth()
     async def disconnect_cmd(ctx: commands.Context):
