@@ -718,15 +718,6 @@ def _build_real_help_embed(bot: commands.Bot, is_vip: bool = False) -> discord.E
             inline=False,
         )
     return embed
-    )
-    if is_vip:
-        embed.add_field(
-            name='\U0001F31F Statut',
-            value='Tu es **VIP**. Ton bot ne sera pas coupe par inactivite.',
-            inline=False,
-        )
-    return embed
-
 
 def _build_fake_help_embed() -> discord.Embed:
     embed = _embed(
