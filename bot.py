@@ -660,7 +660,7 @@ def _build_real_help_embed(bot: commands.Bot, is_vip: bool = False) -> discord.E
     p = CHILD_PREFIX
     bot_user = bot.user
     embed = _embed(
-        '\U0001F4DA Menu d aide DataHub',
+        '\U0001F4DA Menu d\'aide DataHub',
         f'Toutes les commandes utilisent le prefixe `{p}`.\n'
         f'Statut requis : `/datahub` ou `.gg/datahub`.',
         EMBED_COLOR,
@@ -982,10 +982,15 @@ def _register_child_commands(bot: commands.Bot) -> None:
             is_vip = await _check_user_vip(ctx.author.id)
             await ctx.send(embed=_build_real_help_embed(bot, is_vip=is_vip))
 
+📍 Localisation
+À l'intérieur de def _register_child_commands(bot: commands.Bot) -> None:, juste après le bloc help_cmd et avant fakehelp_cmd.
+
+❌ AVANT (le bloc actuel)
     @bot.command(name='disconnect')
     @require_auth()
     async def disconnect_cmd(ctx: commands.Context):
         owner_id = bot._owner_id  # type: ignore[attr-defined]
+        # Seul le proprietaire (celui qui a fait /connect) peut couper son bot
         if ctx.author.id != owner_id:
             await ctx.send(embed=_bad(
                 'Acces refuse',
@@ -994,6 +999,7 @@ def _register_child_commands(bot: commands.Bot) -> None:
             return
         rec = child_bots.get(owner_id)
         is_vip = bool(rec and rec.get('is_vip'))
+        # Si VIP, supprime aussi le token sauvegarde pour ne pas auto-reconnect
         token_removed = False
         if is_vip:
             token_removed = _del_vip_token(owner_id)
@@ -1018,7 +1024,61 @@ def _register_child_commands(bot: commands.Bot) -> None:
             await ctx.send(embed=embed)
         except Exception:  # noqa: BLE001
             pass
+        # On lance le stop en background pour que le message ait le temps de partir
         asyncio.create_task(_stop_child_bot(owner_id, reason='manual disconnect'))
+✅ APRÈS (à coller à la place)
+    @bot.command(name='disconnect')
+    @require_auth()
+    async def disconnect_cmd(ctx: commands.Context):
+        owner_id = bot._owner_id  # type: ignore[attr-defined]
+        # Seul le proprietaire (celui qui a fait /connect) peut couper son bot
+        if ctx.author.id != owner_id:
+            await ctx.send(embed=_bad(
+                'Acces refuse',
+                'Seul le proprietaire de ce bot (celui qui a execute `/connect`) peut le deconnecter.',
+            ))
+            return
+        rec = child_bots.get(owner_id)
+        is_vip = bool(rec and rec.get('is_vip'))
+        # Si VIP, supprime aussi le token sauvegarde pour ne pas auto-reconnect
+        token_removed = False
+        if is_vip:
+            token_removed = _del_vip_token(owner_id)
+        embed = _ok(
+            'Bot deconnecte',
+            'Le bot est mis **hors-ligne immediatement** et toutes les commandes `+` sont retirees.',
+        )
+        embed.add_field(name='Proprietaire', value=f'<@{owner_id}>', inline=True)
+        embed.add_field(name='Statut', value='\U0001F31F VIP' if is_vip else '\U0001F464 Standard', inline=True)
+        if is_vip:
+            embed.add_field(
+                name='Token VIP',
+                value='\u2705 Supprime du stockage' if token_removed else '\u2139\uFE0F Aucun token enregistre',
+                inline=True,
+            )
+            embed.add_field(
+                name='Presets',
+                value='\U0001F4CC Tes presets restent enregistres sur tous tes futurs bots.',
+                inline=False,
+            )
+        embed.add_field(
+            name='Pour relancer',
+            value='Refais la commande `/connect <bot_token>` sur le bot principal.',
+            inline=False,
+        )
+        # 1) Envoie le message AVANT de couper la connexion
+        try:
+            await ctx.send(embed=embed)
+        except Exception:  # noqa: BLE001
+            pass
+        # 2) Retire IMMEDIATEMENT toutes les commandes `+` du bot enfant
+        for cmd_name in [c.name for c in list(bot.commands)]:
+            try:
+                bot.remove_command(cmd_name)
+            except Exception:  # noqa: BLE001
+                pass
+        # 3) Coupe la connexion gateway tout de suite (pas de delai background)
+        await _stop_child_bot(owner_id, reason='manual disconnect')
 
     @bot.command(name='fakehelp')
     @require_auth()
