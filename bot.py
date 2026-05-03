@@ -375,14 +375,6 @@ async def connect_cmd(interaction: discord.Interaction, bot_token: str):
 
     await interaction.followup.send(embed=embed, ephemeral=True)
 
-Trouve la fonction async def connect_cmd(...) et remplace son corps par cet appel à un helper (le helper sera défini juste après) :
-
-@main_bot.tree.command(name='connect', description='Connecte ton bot Discord avec son token')
-@app_commands.describe(bot_token='Le token du bot Discord a connecter')
-async def connect_cmd(interaction: discord.Interaction, bot_token: str):
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    await _do_connect_flow(interaction, bot_token)
-
 # --------------------------------------------------------------------------- #
 # Shared connect flow + Start Panel
 # --------------------------------------------------------------------------- #
