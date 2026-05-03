@@ -418,16 +418,6 @@ class StartPanelView(discord.ui.View):
     async def connect_btn(self, interaction: discord.Interaction, button: discord.ui.Button):  # noqa: ARG002
         await interaction.response.send_modal(ConnectModal())
 
-
-Titre DATAHUB ⚡
-Description en blockquote avec Accès
-Section Modules (# Pré-requis)
-🟢 Statut du bot → + Operationnel (vert via codeblock diff)
-⭐ Avantages VIP
-Bannière LEAK DATAHUB en image principale
-Couleur violet DataHub 0x6210C7
-Voici le diff appliqué dans /app/bot.py (fonction _build_start_panel_embed, lignes ~422–478) :
-
 START_PANEL_BANNER_URL = (
     'https://customer-assets.emergentagent.com/job_0c65728a-0139-4ab7-b643-1bba2143d34d/'
     'artifacts/lo98awgm_75ac813aa39e0ef3d722c9e9bfa69aee.png'
