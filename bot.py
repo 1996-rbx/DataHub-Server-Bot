@@ -433,18 +433,8 @@ def _build_start_panel_embed() -> discord.Embed:
     embed = _embed('DATAHUB 🔗', description, EMBED_COLOR)
 
     embed.add_field(
-        name='**__Informations:__**',
-        value=(
-            f'• Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord**\n'
-            f'• Prefixe des commandes : `{CHILD_PREFIX}`\n'
-            f'• Inactivite : **{INACTIVITY_TIMEOUT // 60} min** standard / '
-            f'**{VIP_INACTIVITY_TIMEOUT // 60} min** VIP'
-        ),
-        inline=False,
-    )
-    embed.add_field(
         name='`🟢` **__Bot Statut:__**',
-        value='```diff\n+ En Ligne\n```',
+        value='```diff\n+ En Ligne\n```\n',
         inline=False,
     )
     embed.add_field(
