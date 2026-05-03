@@ -419,8 +419,7 @@ class StartPanelView(discord.ui.View):
         await interaction.response.send_modal(ConnectModal())
 
 START_PANEL_BANNER_URL = (
-    'https://customer-assets.emergentagent.com/job_0c65728a-0139-4ab7-b643-1bba2143d34d/'
-    'artifacts/lo98awgm_75ac813aa39e0ef3d722c9e9bfa69aee.png'
+    'https://i.postimg.cc/JzwBkCWz/49676a60-4e3a-473c-a714-8f561684fcd6.png'
 )
 
 
@@ -431,12 +430,11 @@ def _build_start_panel_embed() -> discord.Embed:
         '> \n'
         '> **Acces** — clique sur **Connecter** ci-dessous et colle ton **token**.'
     )
-    embed = _embed('DATAHUB ⚡', description, EMBED_COLOR)
+    embed = _embed('DATAHUB 🔗', description, EMBED_COLOR)
 
     embed.add_field(
-        name='Modules',
+        name='**__Informations:__**',
         value=(
-            '`#` **Pre-requis**\n'
             f'• Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord**\n'
             f'• Prefixe des commandes : `{CHILD_PREFIX}`\n'
             f'• Inactivite : **{INACTIVITY_TIMEOUT // 60} min** standard / '
@@ -445,12 +443,12 @@ def _build_start_panel_embed() -> discord.Embed:
         inline=False,
     )
     embed.add_field(
-        name='🟢 Statut du bot',
-        value='```diff\n+ Operationnel\n```',
+        name='`🟢` **__Bot Statut:__**',
+        value='```diff\n+ En Ligne\n```',
         inline=False,
     )
     embed.add_field(
-        name='⭐ Avantages VIP',
+        name='`⭐` **__Avantages VIP:__**',
         value=(
             '• Token sauvegarde → reconnexion auto\n'
             f'• Acces aux presets (`{CHILD_PREFIX}n-config`, `{CHILD_PREFIX}p-run`)\n'
