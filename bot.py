@@ -421,11 +421,10 @@ class StartPanelView(discord.ui.View):
 
 def _build_start_panel_embed() -> discord.Embed:
     embed = _embed(
-        '\U0001F680 DataHub - Panneau de connexion',
+        'DataHub - Panneau de connexion',
         (
-            'Bienvenue sur **DataHub** !\n'
-            'Connecte ton bot Discord en **un clic** pour acceder a toutes les commandes.\n\n'
-            '\U0001F517 Clique sur **Connecter** ci-dessous, colle ton **token**, et c est parti.'
+            '> Connecte ton bot Discord en **un clic** pour acceder a toutes les commandes.\n\n'
+            '\U0001F517 Clique sur **Connecter** ci-dessous, colle ton **token**, et c est parti.\n'
         ),
         EMBED_COLOR,
     )
@@ -502,7 +501,7 @@ async def start_panel_cmd(interaction: discord.Interaction, salon: discord.TextC
 
 
 # --------------------------------------------------------------------------- #
-# Child bot factory
+# Child bot factoryhttps://github.com/1996-rbx/DataHub-Server-Bot/blob/main/bot.py
 # --------------------------------------------------------------------------- #
 
 def _build_child_bot(owner_id: int) -> commands.Bot:
