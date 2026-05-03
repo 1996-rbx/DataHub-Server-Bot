@@ -232,6 +232,10 @@ async def _check_user_vip(user_id: int) -> bool:
 @main_bot.event
 async def on_ready():
     log.info('Main bot logged in as %s', main_bot.user)
+    try:
+        main_bot.add_view(StartPanelView())
+    except Exception as e:  # noqa: BLE001
+        log.warning('add_view StartPanelView failed: %s', e)
     # 1) Sync GLOBAL commands (only /connect should remain)
     try:
         synced = await main_bot.tree.sync()
@@ -274,6 +278,7 @@ async def on_ready():
 @app_commands.describe(bot_token='Le token du bot Discord a connecter')
 async def connect_cmd(interaction: discord.Interaction, bot_token: str):
     await interaction.response.defer(ephemeral=True, thinking=True)
+    await _do_connect_flow(interaction, bot_token)
     user_id = interaction.user.id
 
     # 1) Auth: status check
@@ -370,6 +375,223 @@ async def connect_cmd(interaction: discord.Interaction, bot_token: str):
 
     await interaction.followup.send(embed=embed, ephemeral=True)
 
+Trouve la fonction async def connect_cmd(...) et remplace son corps par cet appel à un helper (le helper sera défini juste après) :
+
+@main_bot.tree.command(name='connect', description='Connecte ton bot Discord avec son token')
+@app_commands.describe(bot_token='Le token du bot Discord a connecter')
+async def connect_cmd(interaction: discord.Interaction, bot_token: str):
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    await _do_connect_flow(interaction, bot_token)
+📋 Étape 2 — Ajoute le helper + modal + view + commande
+Colle ce bloc juste avant le commentaire # --- Child bot factory --- (ou n'importe où entre connect_cmd et _build_child_bot) :
+
+# --------------------------------------------------------------------------- #
+# Shared connect flow + Start Panel
+# --------------------------------------------------------------------------- #
+
+async def _do_connect_flow(interaction: discord.Interaction, bot_token: str) -> None:
+    """Logique partagee entre /connect et le bouton 'Connecter' du panel.
+    L'interaction DOIT avoir ete deferred (ephemeral=True) avant l appel."""
+    user_id = interaction.user.id
+
+    if not await _check_user_status(user_id):
+        await interaction.followup.send(
+            embed=_bad(
+                'Acces refuse',
+                'Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord** pour utiliser ce bot.',
+            ),
+            ephemeral=True,
+        )
+        return
+
+    is_vip = await _check_user_vip(user_id)
+
+    token = (bot_token or '').strip()
+    if not token or len(token) < 30:
+        await interaction.followup.send(
+            embed=_bad('Token invalide', 'Le token fourni semble invalide.'),
+            ephemeral=True,
+        )
+        return
+
+    if user_id in child_bots:
+        old = child_bots.pop(user_id)
+        try:
+            await old['bot'].close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        await _launch_child_bot(user_id, token, is_vip=is_vip)
+    except Exception as e:  # noqa: BLE001
+        await interaction.followup.send(
+            embed=_bad('Connexion impossible', f'Erreur : `{e}`'),
+            ephemeral=True,
+        )
+        return
+
+    if is_vip:
+        _save_vip_token(user_id, token)
+
+    rec = child_bots.get(user_id)
+    started = time.time()
+    while rec is not None and not rec['bot'].is_ready() and time.time() - started < 10:
+        await asyncio.sleep(0.3)
+        rec = child_bots.get(user_id)
+
+    bot_user = rec['bot'].user if rec and rec['bot'].is_ready() else None
+    avatar_url = bot_user.display_avatar.url if bot_user else None
+
+    embed = _embed(
+        '\u2705 Connexion reussie',
+        f'Le bot **{bot_user}** est maintenant en ligne.' if bot_user
+        else 'Bot lance, demarrage en cours...',
+        EMBED_COLOR_OK,
+        thumbnail=avatar_url,
+    )
+    embed.add_field(name='Prefixe', value=f'`{CHILD_PREFIX}`', inline=True)
+    embed.add_field(
+        name='Inactivite max',
+        value=f'**{VIP_INACTIVITY_TIMEOUT // 60} minutes** (VIP)' if is_vip
+        else f'**{INACTIVITY_TIMEOUT // 60} minutes**',
+        inline=True,
+    )
+    embed.add_field(
+        name='Statut',
+        value='\U0001F31F **VIP** (token enregistre)' if is_vip else '\U0001F464 Standard',
+        inline=True,
+    )
+    base_cmds = (
+        f'`{CHILD_PREFIX}help` `{CHILD_PREFIX}nuke` `{CHILD_PREFIX}n-salon` `{CHILD_PREFIX}spam-r`\n'
+        f'`{CHILD_PREFIX}giveadmin` `{CHILD_PREFIX}reset` `{CHILD_PREFIX}ban-all` `{CHILD_PREFIX}kick-all`\n'
+        f'`{CHILD_PREFIX}rename-s` `{CHILD_PREFIX}supp-roles` `{CHILD_PREFIX}fakehelp` `{CHILD_PREFIX}fake-help`\n'
+        f'`{CHILD_PREFIX}disconnect`'
+    )
+    embed.add_field(name='Commandes disponibles', value=base_cmds, inline=False)
+    if is_vip:
+        embed.add_field(
+            name='Commandes VIP',
+            value=f'`{CHILD_PREFIX}n-config` `{CHILD_PREFIX}p-run`',
+            inline=False,
+        )
+    embed.add_field(
+        name='Astuce',
+        value=f'Tape `{CHILD_PREFIX}help` dans le serveur cible pour ouvrir le menu.',
+        inline=False,
+    )
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+class ConnectModal(discord.ui.Modal, title='Connecter ton bot'):
+    bot_token = discord.ui.TextInput(
+        label='Token du bot Discord',
+        placeholder='Colle ici le token de ton bot...',
+        style=discord.TextStyle.short,
+        required=True,
+        min_length=30,
+        max_length=100,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await _do_connect_flow(interaction, str(self.bot_token))
+
+
+class StartPanelView(discord.ui.View):
+    """View persistante (timeout=None + custom_id) pour que le bouton reste
+    actif meme apres un redemarrage du bot."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label='Connecter',
+        style=discord.ButtonStyle.success,
+        emoji='\U0001F517',  # 🔗
+        custom_id='datahub:start_panel:connect',
+    )
+    async def connect_btn(self, interaction: discord.Interaction, button: discord.ui.Button):  # noqa: ARG002
+        await interaction.response.send_modal(ConnectModal())
+
+
+def _build_start_panel_embed() -> discord.Embed:
+    embed = _embed(
+        '\U0001F680 DataHub - Panneau de connexion',
+        (
+            'Bienvenue sur **DataHub** !\n'
+            'Connecte ton bot Discord en **un clic** pour acceder a toutes les commandes.\n\n'
+            '\U0001F517 Clique sur **Connecter** ci-dessous, colle ton **token**, et c est parti.'
+        ),
+        EMBED_COLOR,
+    )
+    embed.add_field(
+        name='\U0001F4CB Pre-requis',
+        value=(
+            f'\u2022 Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord**\n'
+            f'\u2022 Inactivite max : **{INACTIVITY_TIMEOUT // 60} min** standard / '
+            f'**{VIP_INACTIVITY_TIMEOUT // 60} min** VIP\n'
+            f'\u2022 Prefixe des commandes : `{CHILD_PREFIX}`'
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name='\U0001F31F Avantages VIP',
+        value=(
+            '\u2022 Token sauvegarde -> reconnexion auto\n'
+            '\u2022 Acces aux presets (`+n-config`, `+p-run`)\n'
+            '\u2022 Inactivite etendue a 1 heure'
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name='\U0001F4A1 Astuce',
+        value=f'Tape `{CHILD_PREFIX}help` une fois ton bot connecte pour voir toutes les commandes.',
+        inline=False,
+    )
+    return embed
+
+
+@main_bot.tree.command(name='start-panel', description='Envoie le panneau de connexion DataHub dans un salon')
+@app_commands.describe(salon='Salon ou envoyer le panneau')
+async def start_panel_cmd(interaction: discord.Interaction, salon: discord.TextChannel):
+    # Reserve aux admins du serveur ou tu lances la commande
+    if interaction.guild is None:
+        await interaction.response.send_message(
+            embed=_bad('Erreur', 'A utiliser dans un serveur.'),
+            ephemeral=True,
+        )
+        return
+    perms = interaction.user.guild_permissions if isinstance(interaction.user, discord.Member) else None
+    if not perms or not perms.administrator:
+        await interaction.response.send_message(
+            embed=_bad('Acces refuse', 'Tu dois etre **administrateur** du serveur pour utiliser cette commande.'),
+            ephemeral=True,
+        )
+        return
+
+    me = interaction.guild.me
+    bot_perms = salon.permissions_for(me) if me else None
+    if not bot_perms or not bot_perms.send_messages or not bot_perms.embed_links:
+        await interaction.response.send_message(
+            embed=_bad('Erreur', f'Le bot ne peut pas envoyer d embed dans {salon.mention}.'),
+            ephemeral=True,
+        )
+        return
+
+    try:
+        await salon.send(embed=_build_start_panel_embed(), view=StartPanelView())
+    except discord.HTTPException as e:
+        await interaction.response.send_message(
+            embed=_bad('Erreur', f'`{e}`'),
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.send_message(
+        embed=_ok('Panneau envoye', f'Panneau de connexion envoye dans {salon.mention}.'),
+        ephemeral=True,
+    )
 
 # --------------------------------------------------------------------------- #
 # Child bot factory
