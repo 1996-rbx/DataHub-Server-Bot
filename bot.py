@@ -419,39 +419,57 @@ class StartPanelView(discord.ui.View):
         await interaction.response.send_modal(ConnectModal())
 
 
+Titre DATAHUB ⚡
+Description en blockquote avec Accès
+Section Modules (# Pré-requis)
+🟢 Statut du bot → + Operationnel (vert via codeblock diff)
+⭐ Avantages VIP
+Bannière LEAK DATAHUB en image principale
+Couleur violet DataHub 0x6210C7
+Voici le diff appliqué dans /app/bot.py (fonction _build_start_panel_embed, lignes ~422–478) :
+
+START_PANEL_BANNER_URL = (
+    'https://customer-assets.emergentagent.com/job_0c65728a-0139-4ab7-b643-1bba2143d34d/'
+    'artifacts/lo98awgm_75ac813aa39e0ef3d722c9e9bfa69aee.png'
+)
+
+
 def _build_start_panel_embed() -> discord.Embed:
-    embed = _embed(
-        'DataHub - Panneau de connexion',
-        (
-            '> Connecte ton bot Discord en **un clic** pour acceder a toutes les commandes.\n'
-            '> Clique sur **Connecter** ci-dessous, colle ton **token**, et c est parti.\n\n'
-        ),
-        EMBED_COLOR,
+    description = (
+        '> **DATAHUB** — Panel de connexion.\n'
+        '> Connecte ton bot Discord et accede a **toutes les commandes**.\n'
+        '> \n'
+        '> **Acces** — clique sur **Connecter** ci-dessous et colle ton **token**.'
     )
+    embed = _embed('DATAHUB ⚡', description, EMBED_COLOR)
+
     embed.add_field(
-        name='\U0001F4CB Pre-requis',
+        name='Modules',
         value=(
-            f'\u2022 Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord**\n'
-            f'\u2022 Inactivite max : **{INACTIVITY_TIMEOUT // 60} min** standard / '
-            f'**{VIP_INACTIVITY_TIMEOUT // 60} min** VIP\n'
-            f'\u2022 Prefixe des commandes : `{CHILD_PREFIX}`'
+            '`#` **Pre-requis**\n'
+            f'• Mets `/datahub` ou `.gg/datahub` dans ton **statut Discord**\n'
+            f'• Prefixe des commandes : `{CHILD_PREFIX}`\n'
+            f'• Inactivite : **{INACTIVITY_TIMEOUT // 60} min** standard / '
+            f'**{VIP_INACTIVITY_TIMEOUT // 60} min** VIP'
         ),
         inline=False,
     )
     embed.add_field(
-        name='\U0001F31F Avantages VIP',
+        name='🟢 Statut du bot',
+        value='```diff\n+ Operationnel\n```',
+        inline=False,
+    )
+    embed.add_field(
+        name='⭐ Avantages VIP',
         value=(
-            '\u2022 Token sauvegarde -> reconnexion auto\n'
-            '\u2022 Acces aux presets (`+n-config`, `+p-run`)\n'
-            '\u2022 Inactivite etendue a 1 heure'
+            '• Token sauvegarde → reconnexion auto\n'
+            f'• Acces aux presets (`{CHILD_PREFIX}n-config`, `{CHILD_PREFIX}p-run`)\n'
+            '• Inactivite etendue a **1 heure**\n'
+            f'• Astuce : tape `{CHILD_PREFIX}help` une fois connecte'
         ),
         inline=False,
     )
-    embed.add_field(
-        name='\U0001F4A1 Astuce',
-        value=f'Tape `{CHILD_PREFIX}help` une fois ton bot connecte pour voir toutes les commandes.',
-        inline=False,
-    )
+    embed.set_image(url=START_PANEL_BANNER_URL)
     return embed
 
 
